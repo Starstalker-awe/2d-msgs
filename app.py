@@ -1,5 +1,5 @@
 from flask import Flask, render_template as render, request, session, redirect, url_for as url
-from flask_socketio import SocketIO
+import flask_socketio as socketio
 from passlib.hash import argon2
 import flask_session
 import functools
@@ -19,7 +19,7 @@ app.config.update({
 })
 
 flask_session.Session(app)
-socket_ = SocketIO(app)
+socket_ = socketio.SocketIO(app)
 DB = cs50.SQL("sqlite:///data.db")
 
 
@@ -68,6 +68,13 @@ def register():
 	return render("register.html") # Render registration page
 
 
+@login_required
+@socketio.on('verify connection')
+@app.route("/thread/<uuid:thread>")
+def thread(room: uuid.UUID):
+	if DB.execute("SELECT id FROM rooms WHERE users LIKE '%:u_id%' AND id = :r_id", u_id = session.get("u_id"), r_id = str(room)) is not None:
+		socketio.join_room(room, room, f"/thread/{room}")
+		socketio.send(f"{DB.execute('SELECT username FROM users WHERE id = ?', session.get('u_id'))} has logged on!", to=room)
 
 if __name__ == "__main__":
 	socket_.run(app)

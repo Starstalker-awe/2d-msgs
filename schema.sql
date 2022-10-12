@@ -15,3 +15,9 @@ CREATE TABLE IF NOT EXISTS messages(
 	FOREIGN KEY (sender) REFERENCES users(id),
 	FOREIGN KEY (reciever) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS rooms(
+    id VARCHAR(36) PRIMARY KEY NOT NULL,
+    users VARCHAR(73) NOT NULL /* Store both users as space-seperated UUIDs */
+);
+CREATE INDEX room_users ON rooms (users);
