@@ -1,0 +1,9 @@
+{% extends 'templates/base.html' %}
+{% block title %}Login{% endblock %}
+{% block body %}
+            <form method="post">
+                <input type="text" name="username" placeholder="Username/Email" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <input type="submit" value="Login">
+            </form>
+{% endblock %}
