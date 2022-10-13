@@ -1,0 +1,12 @@
+{% extends 'templates/base.html' %}
+{% block title %}Homepage{% endblock %}
+{% block body %}
+            <script type="module">
+                import {io} from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
+                import {source as s, render, template} from 'https://unpkg.com/@lcf.vs/dom-engine@5.5.4/lib/frontend.js';
+
+                const socket = io(window.location.href, {transports: ['websocket']});
+                socket.on("connect", _=>socket.emit("verify", 1));
+                socket.on("verified", resp=>console.log(resp))
+            </script>
+{% endblock %}
