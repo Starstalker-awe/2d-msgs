@@ -19,14 +19,14 @@ app.config.update({
 })
 
 flask_session.Session(app)
-socket_ = socketio.SocketIO(app)
+socket_ = socketio.SocketIO(app, async_mode="eventlet")
 DB = cs50.SQL("sqlite:///data.db")
 
 
 def login_required(f):
 	@functools.wraps(f)
 	def deced(*args, **kwargs):
-		if u := session.get("u_id") or session.get("p_id") != DB.execute("SELECT p_id FROM users WHERE id = ?", u):
+		if (u := session.get("u_id")) or session.get("p_id") != DB.execute("SELECT p_id FROM users WHERE id = ?", u):
 			return redirect(url("login"))
 		return f(*args, **kwargs)
 	return deced
@@ -34,9 +34,8 @@ def login_required(f):
 
 
 @app.route("/")
-@login_required
 def index():
-	return render("index.html")
+	return render("test.html")
 
 @app.route("/login", methods = ['GET', 'POST']) # Handle both methods
 def login():
@@ -68,13 +67,20 @@ def register():
 	return render("register.html") # Render registration page
 
 
-@login_required
-@socketio.on('verify connection')
-@app.route("/thread/<uuid:thread>")
-def thread(room: uuid.UUID):
+@socket_.on("join")
+@app.route("/thread/<uuid:room>")
+def join_room(room: uuid.UUID):
 	if DB.execute("SELECT id FROM rooms WHERE users LIKE '%:u_id%' AND id = :r_id", u_id = session.get("u_id"), r_id = str(room)) is not None:
-		socketio.join_room(room, room, f"/thread/{room}")
-		socketio.send(f"{DB.execute('SELECT username FROM users WHERE id = ?', session.get('u_id'))} has logged on!", to=room)
+		socketio.join_room(room, request.sid, f"/thread/{room}")
+
+@socket_.on("message")
+def room_msg(data):
+	socketio.emit("message", {"data": None}, to=data['room'])
+
+@socket_.on("test")
+def return_test(data):
+	socketio.emit("test", {"data": "Got your message!"})
+		
 
 if __name__ == "__main__":
 	socket_.run(app)
