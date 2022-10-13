@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users(
 	p_id VARCHAR(36) NOT NULL,
 	overwatcher BOOLEAN DEFAULT 0 NOT NULL
 );
+CREATE INDEX user_search ON users (username, email);
 
 CREATE TABLE IF NOT EXISTS messages(
 	id VARCHAR(36) PRIMARY KEY NOT NULL,
@@ -16,8 +17,8 @@ CREATE TABLE IF NOT EXISTS messages(
 	FOREIGN KEY (reciever) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS rooms(
+CREATE TABLE IF NOT EXISTS namespaces(
     id VARCHAR(36) PRIMARY KEY NOT NULL,
     users VARCHAR(73) NOT NULL /* Store both users as space-seperated UUIDs */
 );
-CREATE INDEX room_users ON rooms (users);
+CREATE INDEX namespace_users ON namespaces (users);
