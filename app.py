@@ -2,17 +2,15 @@ from flask import Flask, render_template as render, request, session, redirect, 
 import flask_socketio as socketio
 from passlib.hash import argon2
 from datetime import timedelta, datetime
-from dotmap import DotMap
 import flask_session
 import functools
 import tempfile
 import uuid
 import cs50
-import json
 
 app = Flask(__name__)
 
-CONFIG = DotMap(json.load(open("./config.json")))
+ADMIN_SNOOPING = True
 
 app.config.update({
     "TEMPLATES_AUTO_RELOAD": True,
@@ -27,7 +25,7 @@ app.config.update({
 flask_session.Session(app)
 socket_ = socketio.SocketIO(app, async_mode="eventlet")
 DB = cs50.SQL("sqlite:///data.db")
-OVERWATCHERS = DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if CONFIG.ADMIN_SNOOPING else [] # Admins can see all messages...?
+OVERWATCHERS = DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
 
 
 def login_required(f): # Wrapper for Flask routes
