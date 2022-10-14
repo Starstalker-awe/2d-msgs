@@ -4,13 +4,13 @@
             {% if error %}
                 {% if error == 1 %}
             <h1>Your passwords didn't match!</h1>
-                {% else if error == 2 %}
+                {% else %}
             <h1>That username is taken!</h1>
                 {% endif %}
             {% endif %}
             <form method="post">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="email" name="email" placeholder="Email (optional)">
+                <input type="text" name="username" placeholder="Username" required autofocus autocomplete="nickname">
+                <input type="email" name="email" placeholder="Email (optional)" autocomplete="email">
                 <input type="password" name="password" placeholder="Password" required>
                 <input type="password" name="confirm" placeholder="Confirm Your Password" required>
                 <input type="submit" value="Create Account">
