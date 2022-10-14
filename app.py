@@ -33,7 +33,7 @@ AUTHORIZED = {room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split
 def login_required(f): # Wrapper for Flask routes
 	@functools.wraps(f)
 	def deced(*args, **kwargs):
-		if (u := session.get("u_id")) or session.get("p_id") != DB.execute("SELECT p_id FROM users WHERE id = ?", u): # They have a u_id and it's a current session
+		if (u := session.get("u_id")) == None or session.get('p_id') != next(iter(DB.execute("SELECT p_id FROM users WHERE u_id = ?", u)), {}).get("p_id"):
 			return redirect(url("login"))
 		return f(*args, **kwargs)
 	return deced
@@ -49,9 +49,9 @@ def index():
 @app.route("/login", methods = ['GET', 'POST']) # Handle both methods
 def login():
 	if request.method == 'POST': # Submitting form
-		form = request.form.to_dict() # Convert to dictionary instead of obscure object
-		if len(user := DB.execute("SELECT * FROM users WHERE username = :un OR email = :un", un = form.username)) == 1 and argon2.verify(form.password, user.password): # Verify credentials
-			session.update({'u_id': user.id, 'p_id': user.p_id, "loggedin": datetime.now().timestamp()}) # Update user session
+		form = DotMap(request.form.to_dict()) # Convert to dictionary instead of obscure object
+		if len(user := DB.execute("SELECT * FROM users WHERE username = :un OR email = :un", un = form.username)) == 1 and argon2.verify(form.password, user[0]['password']): # Verify credentials
+			session.update({'u_id': user[0]['u_id'], 'p_id': user[0]['p_id'], "loggedin": datetime.now().timestamp()}) # Update user session
 			return redirect(url("index")) # Return to index
 		return render("login.html", error = True) # Invalid login credentials
 	return render("login.html") # Render page
@@ -70,6 +70,7 @@ def register():
 				"p_id": str(uuid.uuid4()) # Change on password modification to allow "logout everywhere"
 			} # Create dict of user's data
 			user = DB.execute("INSERT INTO users (u_id, username, email, password, p_id) VALUES (:u_id, :username, :email, :password, :p_id)", **data) # Create DB entry
+			print(user)
 			session.update({"id": user.id, "p_id": user.p_id, "loggedin": datetime.now().timestamp()}) # Update session with necessary values, bypassing login
 			return redirect(url("index")) # Send to index
 		return render("register.html", error = 2) # Username is taken
@@ -103,4 +104,4 @@ def conversation(space):
 
 # ==== Run Server ====
 if __name__ == "__main__":
-	socket_.run(app)
+	socket_.run(app, debug=True)
