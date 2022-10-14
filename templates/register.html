@@ -1,6 +1,13 @@
 {% extends 'templates/base.html' %}
 {% block title %}Register{% endblock %}
 {% block body %}
+            {% if error %}
+                {% if error == 1 %}
+            <h1>Your passwords didn't match!</h1>
+                {% else if error == 2 %}
+            <h1>That username is taken!</h1>
+                {% endif %}
+            {% endif %}
             <form method="post">
                 <input type="text" name="username" placeholder="Username" required>
                 <input type="email" name="email" placeholder="Email (optional)">

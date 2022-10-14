@@ -20,14 +20,14 @@ app.config.update({
 	"SESSION_PERMAMENT": True,
 	"PERMANENT_SESSION_LIFETIME": timedelta(weeks=4), # Default one month session length
 	"JSONIFY_PRETTYPRINT_REGULAR": True,
-	"SECRET_KEY": uuid.uuid4()
+	"SECRET_KEY": uuid.uuid4().hex
 })
 
 flask_session.Session(app)
 socket_ = socketio.SocketIO(app, async_mode="eventlet")
 DB = cs50.SQL("sqlite:///data.db")
 OVERWATCHERS = DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
-AUTHORIZED = {room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split(" ")) for a, b in DB.execute("SELECT * FROM namespaces").values()]}
+AUTHORIZED = {room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split(" ")) for a, b in DB.execute("SELECT * FROM namespaces")]}
 
 
 def login_required(f): # Wrapper for Flask routes
@@ -59,15 +59,15 @@ def login():
 @app.route("/register", methods = ['GET', 'POST']) # Handle get and post
 def register():
 	if request.method == 'POST': # Submitting form
-		form = request.form.to_dict() # Convert to dictionary for easier access
+		form = DotMap(request.form.to_dict()) # Convert to dictionary for easier access
 		if form.password != form.confirm: return render("register.html", error = 1) # Check if passwords match
 		if len(DB.execute("SELECT * FROM users WHERE username = :un OR email = :un", un = form.username)) == 0: # Make sure username isn't taken
 			data = {
-				"u_id": uuid.uuid4(), # Unique user id
+				"u_id": str(uuid.uuid4()), # Unique user id
 				"username": form.username, # Username which is required
 				"email": form.email, # Email which may equal None
 				"password": argon2.using(rounds=128,digest_size=41,salt_size=8).hash(form.password), # Hash to 100 characters
-				"p_id": uuid.uuid4() # Change on password modification to allow "logout everywhere"
+				"p_id": str(uuid.uuid4()) # Change on password modification to allow "logout everywhere"
 			} # Create dict of user's data
 			user = DB.execute("INSERT INTO users (u_id, username, email, password, p_id) VALUES (:u_id, :username, :email, :password, :p_id)", **data) # Create DB entry
 			session.update({"id": user.id, "p_id": user.p_id, "loggedin": datetime.now().timestamp()}) # Update session with necessary values, bypassing login
@@ -96,7 +96,7 @@ def conversation(space):
 	def message_sent(data): 
 		data = DotMap(data)
 		if AUTHORIZED[space][data.id]:
-			socket_.emit("message", d := {"id": uuid.uuid4(), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
+			socket_.emit("message", d := {"id": str(uuid.uuid4()), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
 			DB.execute("INSERT INTO MESSAGES (id, sender, namespace_id, message, stamped) VALUES (:id, :sender, :space, :msg, :time)", **{"space": space, **d})
 	return render("index.html")
 		

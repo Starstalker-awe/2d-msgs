@@ -1,6 +1,9 @@
 {% extends 'templates/base.html' %}
 {% block title %}Login{% endblock %}
 {% block body %}
+            {% if error %}
+            <h1>Invalid login credentials!</h1>
+            {% endif %}
             <form method="post">
                 <input type="text" name="username" placeholder="Username/Email" required>
                 <input type="password" name="password" placeholder="Password" required>
