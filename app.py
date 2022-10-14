@@ -2,6 +2,7 @@ from flask import Flask, render_template as render, request, session, redirect, 
 import flask_socketio as socketio
 from passlib.hash import argon2
 from datetime import timedelta, datetime
+from dotmap import DotMap
 import flask_session
 import functools
 import tempfile
@@ -26,6 +27,7 @@ flask_session.Session(app)
 socket_ = socketio.SocketIO(app, async_mode="eventlet")
 DB = cs50.SQL("sqlite:///data.db")
 OVERWATCHERS = DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
+AUTHORIZED = {room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split(" ")) for a, b in DB.execute("SELECT * FROM namespaces").values()]}
 
 
 def login_required(f): # Wrapper for Flask routes
@@ -82,11 +84,20 @@ def logout():
 @login_required
 @app.route("/thread/<uuid:space>")
 def conversation(space):
-	@socket_.on("verify", namespace=f"/thread/{space}")
+	NAMESPACE = f"/thread/{space}"
+	@socket_.on("verify", namespace=NAMESPACE)
 	def verify_connection(_):
-		if DB.execute("SELECT id FROM namespaces WHERE users LIKE ?", f"%{session.get('u_id')}%") == space or (session.get("u_id") in OVERWATCHERS):
-			socket_.emit("verified", "true", namespace=f"/thread/{space}") # Authorized to enter chat
-		socket_.emit("verified", "false", namespace=f"/thread/{space}") # Got room UUID, but unauthorized
+		if DB.execute("SELECT id FROM namespaces WHERE users LIKE ?", f"%{session.get('u_id')}%") == space or (uid := session.get("u_id") in OVERWATCHERS):
+			socket_.emit("verified", "true", namespace=NAMESPACE) # Authorized to enter chat
+			AUTHORIZED[space][uid] = True
+		socket_.emit("verified", "false", namespace=NAMESPACE) # Got room UUID, but unauthorized
+
+	@socket_.on("message", namespace=NAMESPACE)
+	def message_sent(data): 
+		data = DotMap(data)
+		if AUTHORIZED[space][data.id]:
+			socket_.emit("message", d := {"id": uuid.uuid4(), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
+			DB.execute("INSERT INTO MESSAGES (id, sender, namespace_id, message, stamped) VALUES (:id, :sender, :space, :msg, :time)", **{"space": space, **d})
 	return render("index.html")
 		
 
