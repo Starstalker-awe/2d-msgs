@@ -1,13 +1,19 @@
 from flask import Flask, render_template as render, request, session, redirect, url_for as url
-import flask_socketio as socketio
-from passlib.hash import argon2
 from datetime import timedelta, datetime
+from Crypto.Cipher import PKCS1_OAEP
+import flask_socketio as socketio
+from Crypto.PublicKey import RSA
+from passlib.hash import argon2
+from Crypto.Hash import SHA256
 from dotmap import DotMap
 import flask_session
 import functools
+import threading
 import tempfile
+import base64
 import uuid
 import cs50
+import os
 
 app = Flask(__name__)
 
@@ -28,6 +34,7 @@ socket_ = socketio.SocketIO(app, async_mode="eventlet")
 DB = cs50.SQL("sqlite:///data.db")
 OVERWATCHERS = DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
 AUTHORIZED = {room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split(" ")) for a, b in DB.execute("SELECT * FROM namespaces")]}
+CIPHER = PKCS1_OAEP.new(RSA.importKey(open("./private.pem", 'rb').read()), hashAlgo=SHA256)
 
 
 def login_required(f): # Wrapper for Flask routes
@@ -58,22 +65,26 @@ def login():
 
 @app.route("/register", methods = ['GET', 'POST']) # Handle get and post
 def register():
-	if request.method == 'POST': # Submitting form
-		form = DotMap(request.form.to_dict()) # Convert to dictionary for easier access
-		if form.password != form.confirm: return render("register.html", error = 1) # Check if passwords match
-		if len(DB.execute("SELECT * FROM users WHERE username = :un OR email = :un", un = form.username)) == 0: # Make sure username isn't taken
-			data = {
-				"u_id": str(uuid.uuid4()), # Unique user id
-				"username": form.username, # Username which is required
-				"email": form.email, # Email which may equal None
-				"password": argon2.using(rounds=128,digest_size=41,salt_size=8).hash(form.password), # Hash to 100 characters
-				"p_id": str(uuid.uuid4()) # Change on password modification to allow "logout everywhere"
-			} # Create dict of user's data
-			user = DB.execute("INSERT INTO users (u_id, username, email, password, p_id) VALUES (:u_id, :username, :email, :password, :p_id)", **data) # Create DB entry
-			print(user)
-			session.update({"id": user.id, "p_id": user.p_id, "loggedin": datetime.now().timestamp()}) # Update session with necessary values, bypassing login
-			return redirect(url("index")) # Send to index
-		return render("register.html", error = 2) # Username is taken
+	@socket_.on("register", namespace="/register")
+	def register(data):
+		print(data)
+		form = DotMap(CIPHER.decrypt(base64.b64decode(data)))
+		if all(k in form.keys() for k in ['username', 'password', 'confirm']):
+			if form.password != form.confirm: socket_.emit("register", {"data": {"error": 1}}, namespace="/register", to=request.sid)
+			if len(DB.execute("SELECT * FROM users WHERE username = :un OR email = :un", un = form.username)) == 0: # Make sure username isn't taken
+				udata = {
+					"u_id": str(uuid.uuid4()), 	# Unique user id
+					"username": form.username, 	# Username which is required
+					"email": form.email, 		# Email which may equal None
+					"p_id": str(uuid.uuid4()) 	# Change on password modification to allow "logout everywhere"
+				} # Create dict of user's data
+				DB.execute("INSERT INTO users (u_id, username, email, p_id) VALUES (:u_id, :username, :email, :p_id)", **udata)
+				user = DotMap(DB.execute("SELECT * FROM users WHERE u_id = ?", udata['u_id'])[0])
+				threading.Thread(target=lambda:DB.execute("UPDATE users SET password = :pw WHERE u_id = :id", pw = argon2.using(rounds=128,digest_size=41,salt_size=8).hash(form.password), id = user.u_id)).start()
+				session.update({"id": user.id, "p_id": user.p_id, "loggedin": datetime.now().timestamp()})
+				socket_.emit("register", {"data": {"error": None, "u_id": user.u_id}}) # Return "completed"
+			socket_.emit("register", {"data": {"error": 2}}, namespace="/register", to=request.sid) # Username taken
+		socket_.emit("register", {"data": {"error": 3}}, namespace="/register", to=request.sid) # Not all fields supplied
 	return render("register.html") # Render registration page
 
 @app.route("/logout")

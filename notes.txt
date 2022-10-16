@@ -1,1 +1,0 @@
-Fixed logging in, next action is to create a socket to verify, since hashing takes forever, and make "login" and "register" async in that way.
