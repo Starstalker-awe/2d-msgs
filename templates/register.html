@@ -1,13 +1,7 @@
 {% extends 'templates/base.html' %}
 {% block title %}Register{% endblock %}
+{% block head %}<script src="https://unpkg.com/node-forge@1.0.0/dist/forge.min.js"></script>{% endblock %}
 {% block body %}
-            {% if error %}
-                {% if error == 1 %}
-            <h1>Your passwords didn't match!</h1>
-                {% else %}
-            <h1>That username is taken!</h1>
-                {% endif %}
-            {% endif %}
             <form method="post">
                 <input type="text" name="username" placeholder="Username" required autofocus autocomplete="nickname">
                 <input type="email" name="email" placeholder="Email (optional)" autocomplete="email">
@@ -15,4 +9,23 @@
                 <input type="password" name="confirm" placeholder="Confirm Your Password" required>
                 <input type="submit" value="Create Account">
             </form>
+            <script type="module">
+                import {io} from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
+                const socket = io(window.location.href, {transports: ['websocket']});
+
+                
+                document.querySelector("form").addEventListener("submit", e=>{
+                    e.preventDefault();
+                    socket.emit("register", 
+                        forge.pki.publicKeyFromPem("{{ url_for('static', filename='public.pem') }}").encrypt(Object.fromEntries(new FormData(e.target).entries()), "RSA-OAEP", {
+                            md: forge.md.sha256.create(), 
+                            mgf1: forge.mgf1.create()
+                        })
+                    );
+                })
+                
+                socket.on("register", rdata=>{
+                    console.log(rdata)
+                })
+            </script>
 {% endblock %}
