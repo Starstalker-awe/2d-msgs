@@ -1,12 +1,22 @@
 {% extends 'templates/base.html' %}
 {% block title %}Login{% endblock %}
 {% block body %}
-            {% if error %}
-            <h1>Invalid login credentials!</h1>
-            {% endif %}
             <form method="post">
                 <input type="text" name="username" placeholder="Username/Email" required autofocus autocomplete="nickname">
                 <input type="password" name="password" placeholder="Password" required>
                 <input type="submit" value="Login">
             </form>
+            <script type="module">
+                import {io} from "{{ url_for('static', filename='socket.io.esm.min.js') }}";
+                const socket = io(window.location.href, {transports: ['websocket']});
+
+                document.querySelector("form").addEventListener("submit", e=>{
+                    e.preventDefault();
+                    socket.emit("login", Object.fromEntries(new FormData(e.target).entries()))
+                });
+
+                socket.on("login", rdata=>{
+                    console.log(rdata)
+                })
+            </script>
 {% endblock %}
