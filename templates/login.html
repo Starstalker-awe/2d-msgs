@@ -16,7 +16,8 @@
                 });
 
                 socket.on("login", rdata=>{
-                    console.log(rdata)
+                    if(rdata.error){alert("Username or password is incorrect!")}
+                    else{window.location.href = '/'}
                 })
             </script>
 {% endblock %}

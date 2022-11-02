@@ -2,7 +2,7 @@
 {% block title %}Register{% endblock %}
 {% block body %}
             <form method="post">
-                <input type="text" name="username" placeholder="Username" required autofocus autocomplete="nickname">
+                <input type="text" name="username" placeholder="Username" required autofocus autocomplete="username">
                 <input type="email" name="email" placeholder="Email (optional)" autocomplete="email">
                 <input type="password" name="password" placeholder="Password" required>
                 <input type="password" name="confirm" placeholder="Confirm Your Password" required>
@@ -18,7 +18,12 @@
                 })
                 
                 socket.on("register", rdata=>{
-                    console.log(rdata)
+                    switch(rdata.error){
+                        case 1: alert("Your passwords don't match!")
+                        case 2: alert("That username/email has already been used!")
+                        case 3: alert("You need to fill out username and password, stop trying to break the app!")
+                        case null: window.location.href = '/'
+                    }
                 })
             </script>
 {% endblock %}
