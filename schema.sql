@@ -1,10 +1,11 @@
 CREATE TABLE IF NOT EXISTS users(
 	u_id VARCHAR(36) PRIMARY KEY UNIQUE NOT NULL,
 	username TEXT UNIQUE NOT NULL,
-    email VARCHAR(100),
+    email TEXT,
 	password VARCHAR(100),
 	p_id VARCHAR(36) NOT NULL,
-	overwatcher BOOLEAN DEFAULT 0 NOT NULL
+	overwatcher BOOLEAN DEFAULT 0 NOT NULL,
+	active BOOLEAN DEFAULT 1 NOT NULL
 );
 CREATE INDEX IF NOT EXISTS user_search ON users (username, email);
 

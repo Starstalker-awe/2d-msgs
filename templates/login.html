@@ -7,17 +7,13 @@
                 <input type="submit" value="Login">
             </form>
             <script type="module">
-                import {io} from "{{ url_for('static', filename='socket.io.esm.min.js') }}";
-                const socket = io(window.location.href, {transports: ['websocket']});
-
-                document.querySelector("form").addEventListener("submit", e=>{
+                document.querySelector("form").addEventListener("submit", async e=>{
                     e.preventDefault();
-                    socket.emit("login", Object.fromEntries(new FormData(e.target).entries()))
+                    const data = await fetch(window.location.href, {
+                        method: "POST",
+                        body: JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))
+                    });
+                    console.log(await data.json());
                 });
-
-                socket.on("login", rdata=>{
-                    if(rdata.error){alert("Username or password is incorrect!")}
-                    else{window.location.href = '/'}
-                })
             </script>
 {% endblock %}

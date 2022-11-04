@@ -9,21 +9,23 @@
                 <input type="submit" value="Create Account">
             </form>
             <script type="module">
-                import {io} from "{{ url_for('static', filename='socket.io.esm.min.js') }}";
-                const socket = io(window.location.href, {transports: ['websocket']});
-
-                document.querySelector("form").addEventListener("submit", e=>{
+                document.querySelector("form").addEventListener("submit", async e=>{
                     e.preventDefault();
-                    socket.emit("register", Object.fromEntries(new FormData(e.target).entries()));
+                    const data = await fetch(window.location.href, {
+                        method: "POST",
+                        body: JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))
+                    });
+                    console.log(await data.json())
                 })
                 
-                socket.on("register", rdata=>{
+                /*socket.on("register", rdata=>{
+                    console.log(rdata)
                     switch(rdata.error){
                         case 1: alert("Your passwords don't match!")
                         case 2: alert("That username/email has already been used!")
                         case 3: alert("You need to fill out username and password, stop trying to break the app!")
                         case null: window.location.href = '/'
                     }
-                })
+                })*/
             </script>
 {% endblock %}
