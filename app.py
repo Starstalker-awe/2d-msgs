@@ -109,6 +109,7 @@ def conversation(space):
 		if AUTHORIZED[space][data.id]:
 			socket_.emit("message", d := {"id": str(uuid.uuid4()), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
 			DB.execute("INSERT INTO MESSAGES (id, sender, namespace_id, message, stamped) VALUES (:id, :sender, :space, :msg, :time)", **{"space": space, **d})
+
 	return render("index.html")
 		
 
