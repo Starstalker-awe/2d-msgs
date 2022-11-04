@@ -1,6 +1,3 @@
 venv/
 key.pem
 cert.pem
-# Unsure of whether to distribute
-setup.sh
-requitements.txt
