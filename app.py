@@ -105,29 +105,13 @@ def conversation(thread):
 
 	@socket_.on("message", namespace=request.path)
 	def message(data):
-		if ['id', 'reciever', 'message', 'stamped'] not in data.keys(): socket_.send({"data": "Altered socket send!"}, to=request.sid); 
+		if ['id', 'reciever', 'message', 'stamped'] not in data.keys(): socket_.send({"data": "Altered socket send!"}, to=request.sid); socketio.disconnect(sid=request.sid, namespace=request.path)
 		if sid := CONNECTED[(data := DotMap(data)).reciever]:
 			socket_.send({**data, 'sender': request['u_id']}, to=sid)
 			DB.execute("INSERT INTO messages (id, sender, reciever, message, stamped) VALUES (:id, :sender, :reciever, :message, :stamped)", **data, sender=session['u_id'])
 
 	@socket_.on("disconnect", namespace=request.path)
 	def discon_handler(_): CONNECTED[request.sid] = None
-
-
-
-
-
-
-
-
-	@socket_.on("message", namespace=NAMESPACE)
-	def message_sent(data): 
-		data = DotMap(data)
-		if AUTHORIZED[space][data.id]:
-			socket_.emit("message", d := {"id": str(uuid.uuid4()), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
-			DB.execute("INSERT INTO MESSAGES (id, sender, namespace_id, message, stamped) VALUES (:id, :sender, :space, :msg, :time)", **{"space": space, **d})
-
-	return render("index.html")
 		
 
 # ==== Run Server ====
