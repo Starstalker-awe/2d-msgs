@@ -14,9 +14,8 @@ import re
 
 app = Flask(__name__)
 
-ADMIN_SNOOPING = 	True
-DEBUG = 			True
-SECURE = 			False
+DEBUG = 				True
+SECURE = 				False
 
 app.config.update({
     "TEMPLATES_AUTO_RELOAD": True,
@@ -29,12 +28,11 @@ app.config.update({
 })
 
 flask_session.Session(app)
-socket_ = 			socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
-DB = 				cs50.SQL("sqlite:///data.db")
-OVERWATCHERS = 		DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
-CONNECTED =			{u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))}
-HASH_SETTINGS = 	{'rounds': 128, 'digest_size': 41, 'salt_size': 8}
-EMAIL_REGEX = 		re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
+socket_ = 				socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
+DB = 					cs50.SQL("sqlite:///data.db")
+CONNECTED, PASSWORDS =	{u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))} # Connected to 
+HASH_SETTINGS = 		{'rounds': 128, 'digest_size': 41, 'salt_size': 8}
+EMAIL_REGEX = 			re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
 
 
 def login_required(f): # Wrapper for Flask routes
@@ -46,20 +44,16 @@ def login_required(f): # Wrapper for Flask routes
 	return deced
 
 
-
-@app.route("/")
-@login_required
-def index():
-	return render("index.html")
-
 # ==== User Handling Routes ====
 @app.route("/login", methods = ['GET', 'POST']) # Handle both methods
 def login():
 	if request.method == 'POST':
 		username = form.username.lower() if re.fullmatch(EMAIL_REGEX, (form := DotMap(json.loads(request.data))).username) else form.username
-		if len(user := DB.execute("SELECT * FROM users WHERE username = :un OR lower(email) = :un", un = username)) == 1 and argon2.verify(form.password, user[0]['password']): # Verify credentials
-			session.update({'u_id': user[0]['u_id'], 'p_id': user[0]['p_id'], "loggedin": datetime.now().timestamp()}) # Update user session
-			return {"data": {"error": None, "u-id": user[0]['u_id']}}
+		if user := DotMap(next(iter(DB.execute("SELECT * FROM users WHERE username = :un OR lower(email) = :un", un = username)), {})).get("u_id"): # Verify that user exists
+			if PASSWORDS[user.u_id] and PASSWORDS[user.u_id] == form.password or argon2.verify(form.password, user.password):
+				session.update({'u_id': user[0]['u_id'], 'p_id': user[0]['p_id'], "loggedin": datetime.now().timestamp()}) # Update user session
+				PASSWORDS[user[0]['u_id']] = form.password
+				return {"data": {"error": None, "u-id": user[0]['u_id']}}
 		return {"data": {"error": True}}
 	return render("login.html") # Render page
 
@@ -71,10 +65,10 @@ def register():
 			username = form.username.lower() if re.fullmatch(EMAIL_REGEX, (form := DotMap(json.loads(request.data))).username) else form.username
 			if len(DB.execute("SELECT * FROM users WHERE username = :un OR lower(email) = :un", un = username)) == 0: # Make sure username isn't taken
 				udata = {
-					"u_id": str(uuid.uuid4()), 	# Unique user id
+					"u_id": uuid.uuid4().hex, 	# Unique user id
 					"username": form.username, 	# Username which is required
 					"email": form.email, 		# Email which may equal None
-					"p_id": str(uuid.uuid4()) 	# Change on password modification to allow "logout everywhere"
+					"p_id": uuid.uuid4().hex 	# Change on password modification to allow "logout everywhere"
 				} # Create dict of user's data
 				DB.execute("INSERT INTO users (u_id, username, email, p_id) VALUES (:u_id, :username, :email, :p_id)", **udata)
 				user = DotMap(DB.execute("SELECT * FROM users WHERE u_id = ?", udata['u_id'])[0])
@@ -92,11 +86,14 @@ def logout():
 
 # ==== Socket Routes ====
 @login_required
-@app.route("/messages")
-def messages(): pass		
+@app.route("/")
+def messages():
+	@socket_.on("connect", namespace="/messages")
+	def conn(_): CONNECTED[session['u_id']] = request.sid; socket_.emit("verified", True, to=request.sid)
+	return render("index.html")
 
 @login_required
-@app.route("/thread/<uuid:thread>")
+@app.route("/thread/<thread>")
 def conversation(thread):
 	@socket_.on("connect", namespace=request.path)
 	def connection_handler(_):
@@ -106,9 +103,10 @@ def conversation(thread):
 	@socket_.on("message", namespace=request.path)
 	def message(data):
 		if ['id', 'reciever', 'message', 'stamped'] not in data.keys(): socket_.send({"data": "Altered socket send!"}, to=request.sid); socketio.disconnect(sid=request.sid, namespace=request.path)
-		if sid := CONNECTED[(data := DotMap(data)).reciever]:
-			socket_.send({**data, 'sender': request['u_id']}, to=sid)
-			DB.execute("INSERT INTO messages (id, sender, reciever, message, stamped) VALUES (:id, :sender, :reciever, :message, :stamped)", **data, sender=session['u_id'])
+		DB.execute("INSERT INTO messages (id, sender, reciever, message, stamped) VALUES (:id, :sender, :reciever, :message, :stamped)", **data, sender=session['u_id'])
+		if CONNECTED[(data := DotMap(data)).reciever]:
+			socket_.send({**data, 'sender': request['u_id']}, broadcast=True)
+		else: socket_.send(True, to=request.sid)
 
 	@socket_.on("disconnect", namespace=request.path)
 	def discon_handler(_): CONNECTED[request.sid] = None
