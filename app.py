@@ -32,7 +32,7 @@ flask_session.Session(app)
 socket_ = 			socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
 DB = 				cs50.SQL("sqlite:///data.db")
 OVERWATCHERS = 		DB.execute("SELECT u_id FROM users WHERE overwatcher = 1") if ADMIN_SNOOPING else [] # Admins can see all messages...?
-AUTHORIZED = 		{room: {id1: False, id2: False} for room, id1, id2 in [(a, *b.split(" ")) for a, b in DB.execute("SELECT * FROM namespaces")]}
+CONNECTED =			{u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))}
 HASH_SETTINGS = 	{'rounds': 128, 'digest_size': 41, 'salt_size': 8}
 EMAIL_REGEX = 		re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
 
@@ -92,26 +92,37 @@ def logout():
 
 # ==== Socket Routes ====
 @login_required
-@app.route("/thread/<uuid:space>")
-def conversation(space):
-	NAMESPACE = f"/thread/{space}"
-	@socket_.on("verify", namespace=NAMESPACE)
-	def verify_connection(_):
-		if DB.execute("SELECT id FROM namespaces WHERE users LIKE ?", f"%{session.get('u_id')}%") == space or (uid := session.get("u_id") in OVERWATCHERS):
-			socket_.emit("verified", "true", namespace=NAMESPACE, to=request.sid) # Authorized to enter chat
-			AUTHORIZED[space][uid] = True
-		socket_.emit("verified", "false", namespace=NAMESPACE, to=request.sid) # Got room UUID, but unauthorized
-		socketio.disconnect(namespace=NAMESPACE, sid=request.sid) # Terminate their connection
+@app.route("/messages")
+def messages(): pass		
 
-	@socket_.on("message", namespace=NAMESPACE)
-	def message_sent(data): 
-		data = DotMap(data)
-		if AUTHORIZED[space][data.id]:
-			socket_.emit("message", d := {"id": str(uuid.uuid4()), "msg": data.content, "sender": data.u_id, "time": data.timestamp})
-			DB.execute("INSERT INTO MESSAGES (id, sender, namespace_id, message, stamped) VALUES (:id, :sender, :space, :msg, :time)", **{"space": space, **d})
+@login_required
+@app.route("/thread/<uuid:thread>")
+def conversation(thread):
+	@socket_.on("connect", namespace=request.path)
+	def connection_handler(_):
+		CONNECTED[session['u_id']] = request.sid
+		socket_.emit("data", DB.execute("SELECT * FROM messages WHERE (sender = :tu AND reciever = :ou) OR (sender = :ou AND reciever = :tu) ORDER BY stamped DESC LIMIT 50", session.get("u_id"), thread))
 
-	return render("index.html")
-		
+	@socket_.on("message", namespace=request.path)
+	def message(data):
+		if ['id', 'reciever', 'message', 'stamped'] not in data.keys(): socket_.send({"data": "Altered socket send!"}, to=request.sid); 
+		if sid := CONNECTED[(data := DotMap(data)).reciever]:
+			socket_.send({**data, 'sender': request['u_id']}, to=sid)
+			DB.execute("INSERT INTO messages (id, sender, reciever, message, stamped) VALUES (:id, :sender, :reciever, :message, :stamped)", **data, sender=session['u_id'])
+
+	@socket_.on("disconnect", namespace=request.path)
+	def discon_handler(_): CONNECTED[request.sid] = None
+
+
+
+
+
+
+
+
+
+
+
 
 # ==== Run Server ====
 if __name__ == "__main__":
