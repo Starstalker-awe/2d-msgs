@@ -14,8 +14,8 @@ import re
 
 app = Flask(__name__)
 
-DEBUG = 				True
-SECURE = 				False
+DEBUG = True
+SECURE = False
 
 app.config.update({
     "TEMPLATES_AUTO_RELOAD": True,
@@ -28,11 +28,11 @@ app.config.update({
 })
 
 flask_session.Session(app)
-socket_ = 				socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
-DB = 					cs50.SQL("sqlite:///data.db")
-CONNECTED, PASSWORDS =	{u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))} # Connected to 
-HASH_SETTINGS = 		{'rounds': 128, 'digest_size': 41, 'salt_size': 8}
-EMAIL_REGEX = 			re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
+socket_ = socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
+DB = cs50.SQL("sqlite:///data.db")
+CONNECTED, PASSWORDS = {u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))} # Connected to 
+HASH_SETTINGS = {'rounds': 128, 'digest_size': 41, 'salt_size': 8}
+EMAIL_REGEX = re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
 
 
 def login_required(f): # Wrapper for Flask routes
