@@ -1,0 +1,10 @@
+{% extends 'templates/base.html' %}
+{% block body %}
+            <script type="module">
+                import {io} from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
+                import {source as s, render, template} from 'https://unpkg.com/@lcf.vs/dom-engine@5.5.4/lib/frontend.js';
+                const socket = io('/messages', {transports: ['websocket']});
+
+                socket.emit("fake event")
+            </script>
+{% endblock %}

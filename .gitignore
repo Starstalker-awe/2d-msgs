@@ -1,3 +1,4 @@
 key.pem
 cert.pem
 __pycache__/
+writer.sql
