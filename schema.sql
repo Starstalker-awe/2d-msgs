@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users(
     email TEXT,
 	public TINYINT DEFAULT 1 NOT NULL,
 	password VARCHAR(150),
-	pfp TEXT, # Base64 encoded pfp
+	pfp TEXT,
 	p_id VARCHAR(32) NOT NULL,
 	admin BOOLEAN DEFAULT 0 NOT NULL,
 	active BOOLEAN DEFAULT 1 NOT NULL,
@@ -36,3 +36,12 @@ CREATE TABLE IF NOT EXISTS messages(
 CREATE INDEX IF NOT EXISTS message_id ON messages (id);
 CREATE INDEX IF NOT EXISTS message_content ON messages (message);
 CREATE INDEX IF NOT EXISTS message_conversation ON messages (sender, reciever);
+
+
+CREATE TABLE IF NOT EXISTS exploits(
+	id VARCHAR(32) PRIMARY KEY NOT NULL,
+	ip VARCHAR(15) NOT NULL,
+	vpn_chance DECIMAL,
+	descrip TEXT NOT NULL,
+	stamped DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
