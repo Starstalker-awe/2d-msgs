@@ -32,7 +32,7 @@ flask_session.Session(app)
 socket_ = socketio.SocketIO(app, async_mode="eventlet", manage_session=False)
 DB = cs50.SQL("sqlite:///data.db")
 EXPLOITS = cs50.SQL("sqlite:///data.db")
-PASSWORDS = CONNECTED = {u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))} # Connected to 
+PASSWORDS = CONNECTED = {u_id: None for u_id in map(lambda u:u['u_id'], DB.execute("SELECT * FROM users WHERE 1 = 1"))}
 HASH_SETTINGS = {'rounds': 128, 'digest_size': 41, 'salt_size': 8}
 EMAIL_REGEX = re.compile(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+")
 
@@ -133,12 +133,19 @@ def messages():
 
 @login_required
 @app.route("/api/load_msgs", methods=["GET", "POST"])
-def load_messages(): return DB.execute("SELECT * FROM messages WHERE (sender = :tu AND reciever = :ou) OR (sender = :ou AND reciever = :tu) ORDER BY stamped DESC LIMIT 50, :off", tu=session['u_id'], ou=(data := request.get_json(force=True))['to'] or request.args.get("to"), off=(data.get("offset") or 0)*50)
+def load_messages(to=None,uid=None): return DB.execute("SELECT * FROM messages WHERE (sender = :tu AND reciever = :ou) OR (sender = :ou AND reciever = :tu) ORDER BY stamped DESC LIMIT 50, :off", tu=uid or session['u_id'], ou=to or (data := request.get_json(force=True))['to'] or request.args.get("to"), off=(data.get("offset") or 0)*50)
 
 @login_required
 @app.route("/api/load_convos", methods=["GET", "POST"])
-def load_convos(): return DB.execute("SELECT u_id, username, pfp, SUBSTR(messages.message, 0, 200), messages.stamped FROM users WHERE u_id IN (SELECT DISTINCT sender, reciever FROM messages WHERE ((sender = :r AND reciever = :s) OR (sender = :s AND reciever = :r))) INNER JOIN messages ON messages.id = (SELECT id FROM messages WHERE ((sender = :r AND reciever = :s) OR (sender = :s AND reciever = :r)) ORDER BY stamped DESC LIMIT 1)", s=session['u_id'], r=(data := request.get_json(force=True))['to'] or request.args.get('to'), off=(data['offset'] or 0)*20)
-		
+def load_convos(to=None,uid=None): return DB.execute("SELECT u_id, username, pfp, SUBSTR(messages.message, 0, 200), messages.stamped FROM users WHERE u_id IN (SELECT DISTINCT sender, reciever FROM messages WHERE ((sender = :r AND reciever = :s) OR (sender = :s AND reciever = :r))) INNER JOIN messages ON messages.id = (SELECT id FROM messages WHERE ((sender = :r AND reciever = :s) OR (sender = :s AND reciever = :r)) ORDER BY stamped DESC LIMIT 1)", s=uid or session['u_id'], r=to or (data := request.get_json(force=True))['to'] or request.args.get('to'), off=(data['offset'] or 0)*20)
+
+@login_required
+@app.route("/api/load_activity", methods=["GET", "POST"])
+def load_activity(to=None): return {uid['u_id']: True if uid[uid['u_id']] else False for uid in CONNECTED if uid['u_id'] in (to or request.get_json(force=True)['to'] or request.args.get('to').split(','))}
+
+@login_required
+@app.route("/api", methods=["GET", "POST"])
+def load_all(): to, kys = request.get_json(force=True)['to'] or request.args.get("to"), request.get_json(force=True)['kys'] or request.args.get('kys').split(','); return {'messages': load_messages(to, request['u_id']) if 'messages' in kys else None, 'convos': load_convos(to) if 'convos' in kys else None, 'activity': load_activity(to) if 'activity' in kys else None}
 
 # ==== Run Server ====
 if __name__ == "__main__":
